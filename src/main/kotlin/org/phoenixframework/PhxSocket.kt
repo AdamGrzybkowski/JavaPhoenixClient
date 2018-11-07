@@ -64,7 +64,7 @@ open class PhxSocket(
     private var onOpenCallbacks: MutableList<() -> Unit> = ArrayList()
 
     /// Collection of callbacks for onClose socket events
-    private var onCloseCallbacks: MutableList<() -> Unit> = ArrayList()
+    private var onCloseCallbacks: MutableList<(Int) -> Unit> = ArrayList()
 
     /// Collection of callbacks for onError socket events
     private var onErrorCallbacks: MutableList<(Throwable, Response?) -> Unit> = ArrayList()
@@ -188,7 +188,7 @@ open class PhxSocket(
      *
      * @param callback: Callback to register
      */
-    fun onClose(callback: () -> Unit) {
+    fun onClose(callback: (Int) -> Unit) {
         this.onCloseCallbacks.add(callback)
     }
 
@@ -329,7 +329,7 @@ open class PhxSocket(
     }
 
     /** Triggers a message when the socket is closed */
-    private fun onConnectionClosed() {
+    private fun onConnectionClosed(code: Int) {
         this.logItems("Transport: close")
         this.triggerChannelError()
 
@@ -340,7 +340,7 @@ open class PhxSocket(
         if (autoReconnect) reconnectTimer?.scheduleTimeout()
 
         // Inform all onClose callbacks that the Socket closed
-        this.onCloseCallbacks.forEach { it() }
+        this.onCloseCallbacks.forEach { it(code) }
     }
 
     /** Triggers a message when an error comes through the Socket */
@@ -436,7 +436,7 @@ open class PhxSocket(
     }
 
     override fun onClosed(webSocket: WebSocket?, code: Int, reason: String?) {
-        this.onConnectionClosed()
+        this.onConnectionClosed(code)
     }
 
     override fun onFailure(webSocket: WebSocket?, t: Throwable, response: Response?) {
