@@ -104,6 +104,7 @@ open class PhxSocket(
     /// WebSocket connection to the server
     private var connection: WebSocket? = null
 
+    private var shouldForwardWebSocketEvents: Boolean = true
 
     init {
 
@@ -129,7 +130,7 @@ open class PhxSocket(
 
         reconnectTimer = PhxTimer(
             callback = {
-                disconnect().also {
+                closeConnection().also {
                     connect()
                 }
             },
@@ -155,9 +156,12 @@ open class PhxSocket(
      * Disconnects the Socket
      */
     fun disconnect() {
-        connection?.close(1000, null)
-        connection = null
+        this.shouldForwardWebSocketEvents = false
 
+        closeConnection()
+
+        this.heartbeatTimer?.cancel()
+        this.onCloseCallbacks.forEach { it() }
     }
 
     /**
@@ -168,6 +172,7 @@ open class PhxSocket(
     fun connect() {
         // Do not attempt to reconnect if already connected
         if (isConnected) return
+        this.shouldForwardWebSocketEvents = true
         connection = client.newWebSocket(request, this)
     }
 
@@ -403,6 +408,12 @@ open class PhxSocket(
         }
     }
 
+    /** Closes the connection*/
+    private fun closeConnection() {
+        connection?.close(1000, null)
+        connection = null
+    }
+
 
     //------------------------------------------------------------------------------
     // Timers
@@ -419,7 +430,7 @@ open class PhxSocket(
             pendingHeartbeatRef?.let {
                 pendingHeartbeatRef = null
                 logItems("Transport: Heartbeat timeout. Attempt to re-establish connection")
-                disconnect()
+                closeConnection()
                 return@schedule
             }
 
@@ -433,21 +444,21 @@ open class PhxSocket(
     // WebSocketListener
     //------------------------------------------------------------------------------
     override fun onOpen(webSocket: WebSocket?, response: Response?) {
-        this.onConnectionOpened()
+        if (shouldForwardWebSocketEvents) this.onConnectionOpened()
 
     }
 
     override fun onMessage(webSocket: WebSocket?, text: String?) {
         text?.let {
-            this.onConnectionMessage(it)
+            if (shouldForwardWebSocketEvents) this.onConnectionMessage(it)
         }
     }
 
     override fun onClosed(webSocket: WebSocket?, code: Int, reason: String?) {
-        this.onConnectionClosed()
+        if (shouldForwardWebSocketEvents) this.onConnectionClosed()
     }
 
     override fun onFailure(webSocket: WebSocket?, t: Throwable, response: Response?) {
-        this.onConnectionError(t, response)
+        if (shouldForwardWebSocketEvents) this.onConnectionError(t, response)
     }
 }
