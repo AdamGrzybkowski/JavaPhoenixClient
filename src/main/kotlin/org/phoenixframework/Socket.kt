@@ -379,12 +379,9 @@ class Socket(
       pendingHeartbeatRef = null
       logItems("Transport: Heartbeat timeout. Attempt to re-establish connection")
 
-      // Cancel the heartbeat as there is no open connection
-      heartbeatTask?.cancel()
-
       // Disconnect the socket manually. Do not use `teardown` or
       // `disconnect` as they will nil out the websocket delegate
-      this.connection?.disconnect(WS_CLOSE_SOCKET_EXCEPTION, "Heartbeat timed out")
+      onConnectionClosed(WS_CLOSE_SOCKET_EXCEPTION)
       return
     }
 
