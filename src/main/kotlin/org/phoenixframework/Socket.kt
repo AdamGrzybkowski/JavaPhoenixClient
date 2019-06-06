@@ -100,6 +100,8 @@ class Socket(
   /** Disables heartbeats from being sent. Default is false. */
   var skipHeartbeat: Boolean = false
 
+  var autoReconnect: Boolean = false
+
   //------------------------------------------------------------------------------
   // Internal Attributes
   //------------------------------------------------------------------------------
@@ -381,7 +383,7 @@ class Socket(
 
       // Disconnect the socket manually. Do not use `teardown` or
       // `disconnect` as they will nil out the websocket delegate
-      this.connection?.disconnect(WS_CLOSE_NORMAL, "Heartbeat timed out")
+      onConnectionError(Exception("Heartbeat timeout"), null)
       return
     }
 
@@ -426,7 +428,7 @@ class Socket(
 
     // If there was a non-normal event when the connection closed, attempt
     // to schedule a reconnect attempt
-    if (code != WS_CLOSE_NORMAL) {
+    if (autoReconnect && code != WS_CLOSE_NORMAL) {
       reconnectTimer.scheduleTimeout()
     }
   }
