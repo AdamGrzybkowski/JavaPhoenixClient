@@ -127,6 +127,8 @@ class Socket(
   /** Disables heartbeats from being sent. Default is false. */
   var skipHeartbeat: Boolean = false
 
+  var autoReconnect: Boolean = false
+
   //------------------------------------------------------------------------------
   // Internal Attributes
   //------------------------------------------------------------------------------
@@ -425,8 +427,9 @@ class Socket(
       pendingHeartbeatRef = null
       logItems("Transport: Heartbeat timeout. Attempt to re-establish connection")
 
-      // Close the socket, flagging the closure as abnormal
-      this.abnormalClose("heartbeat timeout")
+      // Disconnect the socket manually. Do not use `teardown` or
+      // `disconnect` as they will nil out the websocket delegate
+      onConnectionError(Exception("Heartbeat timeout"), null)
       return
     }
 
@@ -437,17 +440,6 @@ class Socket(
         event = Channel.Event.HEARTBEAT.value,
         payload = mapOf(),
         ref = pendingHeartbeatRef)
-  }
-
-  private fun abnormalClose(reason: String) {
-    this.closeWasClean = false
-
-    /*
-      We use NORMAL here since the client is the one determining to close the connection. However,
-      we keep a flag `closeWasClean` set to false so that the client knows that it should attempt
-      to reconnect.
-     */
-    this.connection?.disconnect(WS_CLOSE_NORMAL, reason)
   }
 
   //------------------------------------------------------------------------------
@@ -480,13 +472,14 @@ class Socket(
     this.heartbeatTask?.cancel()
     this.heartbeatTask = null
 
-    // Only attempt to reconnect if the socket did not close normally
-    if (!this.closeWasClean) {
-      this.reconnectTimer.scheduleTimeout()
-    }
-
     // Inform callbacks the socket closed
     this.stateChangeCallbacks.close.forEach { it.invoke() }
+
+    // If there was a non-normal event when the connection closed, attempt
+    // to schedule a reconnect attempt
+    if (autoReconnect && code != WS_CLOSE_NORMAL) {
+      reconnectTimer.scheduleTimeout()
+    }
   }
 
   internal fun onConnectionMessage(rawMessage: String) {
