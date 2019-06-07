@@ -381,7 +381,7 @@ class Socket(
 
       // Disconnect the socket manually. Do not use `teardown` or
       // `disconnect` as they will nil out the websocket delegate
-      onConnectionClosed(WS_CLOSE_SOCKET_EXCEPTION)
+      onConnectionError(Exception(), null)
       return
     }
 
